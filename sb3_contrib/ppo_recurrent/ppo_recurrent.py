@@ -147,6 +147,8 @@ class RecurrentPPO(OnPolicyAlgorithm):
         )
         self.policy = self.policy.to(self.device)
 
+        print(self.policy)
+
         lstm = self.policy.lstm_actor
 
         if not isinstance(self.policy, RecurrentActorCriticPolicy):
@@ -369,6 +371,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
+                #print(rollout_data)
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
