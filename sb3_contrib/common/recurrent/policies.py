@@ -59,28 +59,28 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
     """
 
     def __init__(
-        self,
-        observation_space: gym.spaces.Space,
-        action_space: gym.spaces.Space,
-        lr_schedule: Schedule,
-        net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
-        activation_fn: Type[nn.Module] = nn.Tanh,
-        ortho_init: bool = True,
-        use_sde: bool = False,
-        log_std_init: float = 0.0,
-        full_std: bool = True,
-        sde_net_arch: Optional[List[int]] = None,
-        use_expln: bool = False,
-        squash_output: bool = False,
-        features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
-        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
-        normalize_images: bool = True,
-        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
-        optimizer_kwargs: Optional[Dict[str, Any]] = None,
-        lstm_hidden_size: int = 256,
-        n_lstm_layers: int = 1,
-        shared_lstm: bool = False,
-        enable_critic_lstm: bool = False,
+            self,
+            observation_space: gym.spaces.Space,
+            action_space: gym.spaces.Space,
+            lr_schedule: Schedule,
+            net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
+            activation_fn: Type[nn.Module] = nn.Tanh,
+            ortho_init: bool = True,
+            use_sde: bool = False,
+            log_std_init: float = 0.0,
+            full_std: bool = True,
+            sde_net_arch: Optional[List[int]] = None,
+            use_expln: bool = False,
+            squash_output: bool = False,
+            features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
+            features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+            normalize_images: bool = True,
+            optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+            optimizer_kwargs: Optional[Dict[str, Any]] = None,
+            lstm_hidden_size: int = 256,
+            n_lstm_layers: int = 1,
+            shared_lstm: bool = False,
+            enable_critic_lstm: bool = False,
     ):
         self.lstm_output_dim = lstm_hidden_size
         super().__init__(
@@ -110,7 +110,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         self.critic = None
         self.lstm_critic = None
         assert not (
-            self.shared_lstm and self.enable_critic_lstm
+                self.shared_lstm and self.enable_critic_lstm
         ), "You must choose between shared LSTM, seperate or no LSTM for the critic"
 
         if not (self.shared_lstm or self.enable_critic_lstm):
@@ -136,10 +136,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
     @staticmethod
     def _process_sequence(
-        features: th.Tensor,
-        lstm_states: Tuple[th.Tensor, th.Tensor],
-        episode_starts: th.Tensor,
-        lstm: nn.LSTM,
+            features: th.Tensor,
+            lstm_states: Tuple[th.Tensor, th.Tensor],
+            episode_starts: th.Tensor,
+            lstm: nn.LSTM,
     ) -> Tuple[th.Tensor, th.Tensor]:
         # LSTM logic
         # (sequence length, n_envs, features dim) (batch size = n envs)
@@ -147,6 +147,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         # Batch to sequence
         features_sequence = features.reshape((n_envs, -1, lstm.input_size)).swapaxes(0, 1)
         episode_starts = episode_starts.reshape((n_envs, -1)).swapaxes(0, 1)
+
+        if th.all(episode_starts == 0.0):
+            hidden_eff, lstm_states_eff = lstm(features_sequence, lstm_states)
+            hidden_eff = th.flatten(hidden_eff.transpose(0, 1), start_dim=0, end_dim=1)
+            return hidden_eff, lstm_states_eff
 
         lstm_output = []
         # Iterate over the sequence
@@ -164,11 +169,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return lstm_output, lstm_states
 
     def forward(
-        self,
-        obs: th.Tensor,
-        lstm_states: RNNStates,
-        episode_starts: th.Tensor,
-        deterministic: bool = False,
+            self,
+            obs: th.Tensor,
+            lstm_states: RNNStates,
+            episode_starts: th.Tensor,
+            deterministic: bool = False,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, RNNStates]:
         """
         Forward pass in all the networks (actor and critic)
@@ -205,10 +210,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return actions, values, log_prob, RNNStates(lstm_states_pi, lstm_states_vf)
 
     def get_distribution(
-        self,
-        obs: th.Tensor,
-        lstm_states: Tuple[th.Tensor, th.Tensor],
-        episode_starts: th.Tensor,
+            self,
+            obs: th.Tensor,
+            lstm_states: Tuple[th.Tensor, th.Tensor],
+            episode_starts: th.Tensor,
     ) -> Tuple[Distribution, Tuple[th.Tensor, ...]]:
         """
         Get the current policy distribution given the observations.
@@ -225,10 +230,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return self._get_action_dist_from_latent(latent_pi), lstm_states
 
     def predict_values(
-        self,
-        obs: th.Tensor,
-        lstm_states: Tuple[th.Tensor, th.Tensor],
-        episode_starts: th.Tensor,
+            self,
+            obs: th.Tensor,
+            lstm_states: Tuple[th.Tensor, th.Tensor],
+            episode_starts: th.Tensor,
     ) -> th.Tensor:
         """
         Get the estimated values according to the current policy given the observations.
@@ -253,11 +258,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return self.value_net(latent_vf)
 
     def evaluate_actions(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor,
-        lstm_states: RNNStates,
-        episode_starts: th.Tensor,
+            self,
+            obs: th.Tensor,
+            actions: th.Tensor,
+            lstm_states: RNNStates,
+            episode_starts: th.Tensor,
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Evaluate actions according to the current policy,
@@ -291,11 +296,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return values, log_prob, distribution.entropy()
 
     def _predict(
-        self,
-        observation: th.Tensor,
-        lstm_states: Tuple[th.Tensor, th.Tensor],
-        episode_starts: th.Tensor,
-        deterministic: bool = False,
+            self,
+            observation: th.Tensor,
+            lstm_states: Tuple[th.Tensor, th.Tensor],
+            episode_starts: th.Tensor,
+            deterministic: bool = False,
     ) -> Tuple[th.Tensor, Tuple[th.Tensor, ...]]:
         """
         Get the action according to the policy for a given observation.
@@ -311,11 +316,11 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         return distribution.get_actions(deterministic=deterministic), lstm_states
 
     def predict(
-        self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
-        deterministic: bool = False,
+            self,
+            observation: Union[np.ndarray, Dict[str, np.ndarray]],
+            state: Optional[Tuple[np.ndarray, ...]] = None,
+            episode_start: Optional[np.ndarray] = None,
+            deterministic: bool = False,
     ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
         """
         Get the policy action from an observation (and optional hidden state).
@@ -416,27 +421,27 @@ class RecurrentActorCriticCnnPolicy(RecurrentActorCriticPolicy):
     """
 
     def __init__(
-        self,
-        observation_space: gym.spaces.Space,
-        action_space: gym.spaces.Space,
-        lr_schedule: Schedule,
-        net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
-        activation_fn: Type[nn.Module] = nn.Tanh,
-        ortho_init: bool = True,
-        use_sde: bool = False,
-        log_std_init: float = 0.0,
-        full_std: bool = True,
-        sde_net_arch: Optional[List[int]] = None,
-        use_expln: bool = False,
-        squash_output: bool = False,
-        features_extractor_class: Type[BaseFeaturesExtractor] = NatureCNN,
-        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
-        normalize_images: bool = True,
-        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
-        optimizer_kwargs: Optional[Dict[str, Any]] = None,
-        lstm_hidden_size: int = 256,
-        n_lstm_layers: int = 1,
-        enable_critic_lstm: bool = False,
+            self,
+            observation_space: gym.spaces.Space,
+            action_space: gym.spaces.Space,
+            lr_schedule: Schedule,
+            net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
+            activation_fn: Type[nn.Module] = nn.Tanh,
+            ortho_init: bool = True,
+            use_sde: bool = False,
+            log_std_init: float = 0.0,
+            full_std: bool = True,
+            sde_net_arch: Optional[List[int]] = None,
+            use_expln: bool = False,
+            squash_output: bool = False,
+            features_extractor_class: Type[BaseFeaturesExtractor] = NatureCNN,
+            features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+            normalize_images: bool = True,
+            optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+            optimizer_kwargs: Optional[Dict[str, Any]] = None,
+            lstm_hidden_size: int = 256,
+            n_lstm_layers: int = 1,
+            enable_critic_lstm: bool = False,
     ):
         super().__init__(
             observation_space,
@@ -502,27 +507,27 @@ class RecurrentMultiInputActorCriticPolicy(RecurrentActorCriticPolicy):
     """
 
     def __init__(
-        self,
-        observation_space: gym.spaces.Space,
-        action_space: gym.spaces.Space,
-        lr_schedule: Schedule,
-        net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
-        activation_fn: Type[nn.Module] = nn.Tanh,
-        ortho_init: bool = True,
-        use_sde: bool = False,
-        log_std_init: float = 0.0,
-        full_std: bool = True,
-        sde_net_arch: Optional[List[int]] = None,
-        use_expln: bool = False,
-        squash_output: bool = False,
-        features_extractor_class: Type[BaseFeaturesExtractor] = CombinedExtractor,
-        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
-        normalize_images: bool = True,
-        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
-        optimizer_kwargs: Optional[Dict[str, Any]] = None,
-        lstm_hidden_size: int = 256,
-        n_lstm_layers: int = 1,
-        enable_critic_lstm: bool = False,
+            self,
+            observation_space: gym.spaces.Space,
+            action_space: gym.spaces.Space,
+            lr_schedule: Schedule,
+            net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
+            activation_fn: Type[nn.Module] = nn.Tanh,
+            ortho_init: bool = True,
+            use_sde: bool = False,
+            log_std_init: float = 0.0,
+            full_std: bool = True,
+            sde_net_arch: Optional[List[int]] = None,
+            use_expln: bool = False,
+            squash_output: bool = False,
+            features_extractor_class: Type[BaseFeaturesExtractor] = CombinedExtractor,
+            features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+            normalize_images: bool = True,
+            optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+            optimizer_kwargs: Optional[Dict[str, Any]] = None,
+            lstm_hidden_size: int = 256,
+            n_lstm_layers: int = 1,
+            enable_critic_lstm: bool = False,
     ):
         super().__init__(
             observation_space,
