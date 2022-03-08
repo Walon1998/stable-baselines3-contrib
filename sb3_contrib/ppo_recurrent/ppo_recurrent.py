@@ -71,6 +71,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         learning_rate: Union[float, Schedule] = 3e-4,
         n_steps: int = 128,
         batch_size: Optional[int] = 128,
+        lstm_unroll_length: Optional[int] = None,
         n_epochs: int = 10,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
@@ -126,6 +127,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         self.target_kl = target_kl
         self._last_lstm_states = None
         self.sampling_strategy = sampling_strategy
+        self.lstm_unroll_length = lstm_unroll_length
 
         if _init_setup_model:
             self._setup_model()
@@ -180,6 +182,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             gae_lambda=self.gae_lambda,
             n_envs=self.n_envs,
             sampling_strategy=self.sampling_strategy,
+            lstm_unroll_length=self.lstm_unroll_length
         )
 
         # Initialize schedules for policy/value clipping
