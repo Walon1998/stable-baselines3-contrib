@@ -146,12 +146,12 @@ class RecurrentRolloutBuffer(RolloutBuffer):
                 batch_inds_small = batch_inds[i:i + self.lstm_unroll_length * batch_size]
 
                 lstm_states_pi = (
-                    self.hidden_states_pi[batch_inds_small][lstm_state_index].reshape(1, batch_size, -1),
-                    self.cell_states_pi[batch_inds_small][lstm_state_index].reshape(1, batch_size, -1)
+                    self.hidden_states_pi[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1),
+                    self.cell_states_pi[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1)
                 )
                 lstm_states_vf = (
-                    self.hidden_states_vf[batch_inds_small][lstm_state_index].reshape(1, batch_size, -1),
-                    self.cell_states_vf[batch_inds_small][lstm_state_index].reshape(1, batch_size, -1)
+                    self.hidden_states_vf[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1),
+                    self.cell_states_vf[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1)
                 )
 
                 lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
