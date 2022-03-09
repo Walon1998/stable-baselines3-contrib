@@ -140,10 +140,10 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         for start_env_idx in range(0, self.n_envs, batch_size):
             end_env_idx = start_env_idx + batch_size
             mini_batch_env_indices = env_indices[start_env_idx:end_env_idx]
-            batch_inds = flat_indices[mini_batch_env_indices].ravel()
+            batch_inds = flat_indices[mini_batch_env_indices]
 
-            for i in range(0, self.buffer_size * batch_size, self.lstm_unroll_length * batch_size):
-                batch_inds_small = batch_inds[i:i + self.lstm_unroll_length * batch_size]
+            for i in range(0, self.buffer_size, self.lstm_unroll_length):
+                batch_inds_small = batch_inds[:, i:i + self.lstm_unroll_length].ravel()
 
                 lstm_states_pi = (
                     self.hidden_states_pi[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1),

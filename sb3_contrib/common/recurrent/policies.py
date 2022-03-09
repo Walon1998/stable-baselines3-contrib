@@ -148,6 +148,8 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         features_sequence = features.reshape((n_envs, -1, lstm.input_size)).swapaxes(0, 1)
         episode_starts = episode_starts.reshape((n_envs, -1)).swapaxes(0, 1)
 
+        # print("features_sequence: ", features_sequence.shape)
+
         if th.all(episode_starts == 0.0):
             hidden_eff, lstm_states_eff = lstm(features_sequence, lstm_states)
             hidden_eff = th.flatten(hidden_eff.transpose(0, 1), start_dim=0, end_dim=1)
