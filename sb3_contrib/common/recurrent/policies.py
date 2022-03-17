@@ -227,7 +227,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         assert self.shared_lstm
 
         latent_pi = self.mlp_extractor.forward_actor(lstm_output)
-        latent_vf = self.mlp_extractor.forward_critic(lstm_output)  # TODO: Detach ?
+        latent_vf = self.mlp_extractor.forward_critic(lstm_output)
 
         values = self.value_net(latent_vf)
 
