@@ -211,6 +211,30 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob, RNNStates(lstm_states_pi, lstm_states_vf)
 
+    def supervised_helper_forward(self, obs: th.Tensor, lstm_states: Tuple[th.Tensor, th.Tensor]) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+        """
+                Forward pass in all the networks (actor and critic)
+                Helper used for supervised learning
+
+                :param obs: Observation. Observation
+                :param lstm_states: The last hidden and memory states for the LSTM.
+                :return: alue and action logits and lstm_states
+        """
+        features = self.extract_features(obs)
+
+        lstm_output, lstm_states_new = self.lstm_actor(features, lstm_states)
+
+        assert self.shared_lstm
+
+        latent_pi = self.mlp_extractor.forward_actor(lstm_output)
+        latent_vf = self.mlp_extractor.forward_critic(lstm_output)  # TODO: Detach ?
+
+        values = self.value_net(latent_vf)
+
+        action_logits = self.action_net(latent_pi)
+
+        return values, action_logits, lstm_states_new
+
     def get_distribution(
             self,
             obs: th.Tensor,
