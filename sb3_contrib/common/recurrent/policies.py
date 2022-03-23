@@ -122,6 +122,18 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
+    def _get_constructor_parameters(self) -> Dict[str, Any]:
+        data = super()._get_constructor_parameters()
+
+        data.update(
+            dict(
+                lstm_hidden_size=self.lstm_output_dim,
+                shared_lstm=self.shared_lstm,
+                enable_critic_lstm=self.enable_critic_lstm,
+            )
+        )
+        return data
+
     def _build_mlp_extractor(self) -> None:
         """
         Create the policy and value networks.
