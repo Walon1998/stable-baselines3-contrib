@@ -229,7 +229,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         assert obs.size(2) == 118
         assert action_logits.size(2) == 22
 
-        has_boost = obs[:, :, 13] > 0
+        has_boost = obs[:, :, 13] > 0.0
         on_ground = obs[:, :, 14]
         has_flip = obs[:, :, 15]
 
