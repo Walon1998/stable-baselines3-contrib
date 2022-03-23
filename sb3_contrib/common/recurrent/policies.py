@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import gym
 import numpy as np
+import torch
 import torch as th
 from stable_baselines3.common.distributions import Distribution
 from stable_baselines3.common.policies import ActorCriticPolicy
@@ -223,6 +224,43 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob, RNNStates(lstm_states_pi, lstm_states_vf)
 
+    def mask(self, obs: th.Tensor, action_logits: th.Tensor) -> th.Tensor:
+
+        assert obs.size(2) == 118
+        assert action_logits.size(2) == 22
+
+        has_boost = obs[:, :, 13] > 0
+        on_ground = obs[:, :, 14]
+        has_flip = obs[:, :, 15]
+
+        not_on_ground = torch.logical_not(on_ground)
+        mask = torch.ones_like(action_logits, dtype=torch.bool)
+
+        # mask[:, 0:3] = 1.0  # Throttle, always possible
+        # mask[:, 3:8] = 1.0  # Steer yaw, always possible
+        # mask[:, 8:13] = 1.0  # pitch, not on ground but (flip resets, walldashes)
+        # mask[:, 13:16] = 1.0  # roll, not on ground
+        # mask[:, 16:18] = 1.0  # jump, has flip (turtle)
+        # mask[:, 18:20] = 1.0  # boost, boost > 0
+        # mask[:, 20:22] = 1.0  # Handbrake, at least one wheel ground (not doable)
+
+        mask[:, :, 8] = not_on_ground  # pitch -1
+        mask[:, :, 9] = not_on_ground  # pitch -0.5
+        mask[:, :, 11] = not_on_ground  # pitch 0.5
+        mask[:, :, 12] = not_on_ground  # pitch 1.0
+
+        mask[:, :, 13] = not_on_ground  # roll -1
+        mask[:, :, 15] = not_on_ground  # roll 1
+
+        mask[:, :, 17] = has_flip  # Jump
+        mask[:, :, 19] = has_boost  # boost
+
+        HUGE_NEG = th.tensor(-1e8, dtype=action_logits.dtype, device=self.device)
+
+        logits = th.where(mask, action_logits, HUGE_NEG)
+
+        return logits
+
     def supervised_helper_forward(self, obs: th.Tensor, lstm_states: Tuple[th.Tensor, th.Tensor]) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
                 Forward pass in all the networks (actor and critic)
@@ -245,7 +283,9 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         action_logits = self.action_net(latent_pi)
 
-        return values, action_logits, lstm_states_new
+        masked_logits = self.mask(obs, action_logits)
+
+        return values, masked_logits, lstm_states_new
 
     def get_distribution(
             self,
