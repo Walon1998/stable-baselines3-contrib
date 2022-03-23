@@ -226,12 +226,12 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
     def mask(self, obs: th.Tensor, action_logits: th.Tensor) -> th.Tensor:
 
-        assert obs.size(2) == 118
-        assert action_logits.size(2) == 22
+        assert obs.size(1) == 118
+        assert action_logits.size(1) == 22
 
-        has_boost = obs[:, :, 13] > 0.0
-        on_ground = obs[:, :, 14]
-        has_flip = obs[:, :, 15]
+        has_boost = obs[:, 13] > 0.0
+        on_ground = obs[:, 14]
+        has_flip = obs[:, 15]
 
         not_on_ground = torch.logical_not(on_ground)
         mask = torch.ones_like(action_logits, dtype=torch.bool)
@@ -244,16 +244,21 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         # mask[:, 18:20] = 1.0  # boost, boost > 0
         # mask[:, 20:22] = 1.0  # Handbrake, at least one wheel ground (not doable)
 
-        mask[:, :, 8] = not_on_ground  # pitch -1
-        mask[:, :, 9] = not_on_ground  # pitch -0.5
-        mask[:, :, 11] = not_on_ground  # pitch 0.5
-        mask[:, :, 12] = not_on_ground  # pitch 1.0
+        mask[:, 0] = on_ground  # throttle -1
+        mask[:, 2] = on_ground  # throttle 1
 
-        mask[:, :, 13] = not_on_ground  # roll -1
-        mask[:, :, 15] = not_on_ground  # roll 1
+        mask[:, 8] = not_on_ground  # pitch -1
+        mask[:, 9] = not_on_ground  # pitch -0.5
+        mask[:, 11] = not_on_ground  # pitch 0.5
+        mask[:, 12] = not_on_ground  # pitch 1.0
 
-        mask[:, :, 17] = has_flip  # Jump
-        mask[:, :, 19] = has_boost  # boost
+        mask[:, 13] = not_on_ground  # roll -1
+        mask[:, 15] = not_on_ground  # roll 1
+
+        mask[:, 17] = has_flip  # Jump
+        mask[:, 19] = has_boost  # boost
+
+        mask[:, 21] = on_ground  # Handbrake
 
         HUGE_NEG = th.tensor(-1e8, dtype=action_logits.dtype, device=self.device)
 
@@ -283,7 +288,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         action_logits = self.action_net(latent_pi)
 
-        #masked_logits = self.mask(obs, action_logits)
+        # masked_logits = self.mask(obs, action_logits)
 
         return values, action_logits, lstm_states_new
 
