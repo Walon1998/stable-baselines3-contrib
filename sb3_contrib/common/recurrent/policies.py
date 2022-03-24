@@ -219,52 +219,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         # Evaluate the values for the given observations
         values = self.value_net(latent_vf)
-        distribution = self._get_action_dist_from_latent(latent_pi)
+        distribution = self._get_action_dist_from_latent(latent_pi, obs)
         actions = distribution.get_actions(deterministic=deterministic)
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob, RNNStates(lstm_states_pi, lstm_states_vf)
-
-    def mask(self, obs: th.Tensor, action_logits: th.Tensor) -> th.Tensor:
-
-        assert obs.size(1) == 118
-        assert action_logits.size(1) == 22
-
-        has_boost = obs[:, 13] > 0.0
-        on_ground = obs[:, 14]
-        has_flip = obs[:, 15]
-
-        not_on_ground = torch.logical_not(on_ground)
-        mask = torch.ones_like(action_logits, dtype=torch.bool)
-
-        # mask[:, 0:3] = 1.0  # Throttle, always possible
-        # mask[:, 3:8] = 1.0  # Steer yaw, always possible
-        # mask[:, 8:13] = 1.0  # pitch, not on ground but (flip resets, walldashes)
-        # mask[:, 13:16] = 1.0  # roll, not on ground
-        # mask[:, 16:18] = 1.0  # jump, has flip (turtle)
-        # mask[:, 18:20] = 1.0  # boost, boost > 0
-        # mask[:, 20:22] = 1.0  # Handbrake, at least one wheel ground (not doable)
-
-        mask[:, 0] = on_ground  # throttle -1
-        mask[:, 2] = on_ground  # throttle 1
-
-        mask[:, 8] = not_on_ground  # pitch -1
-        mask[:, 9] = not_on_ground  # pitch -0.5
-        mask[:, 11] = not_on_ground  # pitch 0.5
-        mask[:, 12] = not_on_ground  # pitch 1.0
-
-        mask[:, 13] = not_on_ground  # roll -1
-        mask[:, 15] = not_on_ground  # roll 1
-
-        mask[:, 17] = has_flip  # Jump
-        mask[:, 19] = has_boost  # boost
-
-        mask[:, 21] = on_ground  # Handbrake
-
-        HUGE_NEG = th.tensor(-1e8, dtype=action_logits.dtype, device=self.device)
-
-        logits = th.where(mask, action_logits, HUGE_NEG)
-
-        return logits
 
     def supervised_helper_forward(self, obs: th.Tensor, lstm_states: Tuple[th.Tensor, th.Tensor]) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
@@ -310,7 +268,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         features = self.extract_features(obs)
         latent_pi, lstm_states = self._process_sequence(features, lstm_states, episode_starts, self.lstm_actor)
         latent_pi = self.mlp_extractor.forward_actor(latent_pi)
-        return self._get_action_dist_from_latent(latent_pi), lstm_states
+        return self._get_action_dist_from_latent(latent_pi, obs), lstm_states
 
     def predict_values(
             self,
@@ -373,7 +331,7 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         latent_pi = self.mlp_extractor.forward_actor(latent_pi)
         latent_vf = self.mlp_extractor.forward_critic(latent_vf)
 
-        distribution = self._get_action_dist_from_latent(latent_pi)
+        distribution = self._get_action_dist_from_latent(latent_pi, obs)
         log_prob = distribution.log_prob(actions)
         values = self.value_net(latent_vf)
         return values, log_prob, distribution.entropy()
