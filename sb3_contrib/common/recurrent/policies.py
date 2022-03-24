@@ -246,8 +246,6 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         action_logits = self.action_net(latent_pi)
 
-        # masked_logits = self.mask(obs, action_logits)
-
         return values, action_logits, lstm_states_new
 
     def get_distribution(
