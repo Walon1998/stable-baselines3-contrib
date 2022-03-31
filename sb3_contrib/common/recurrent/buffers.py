@@ -195,13 +195,13 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             self.hidden_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
             self.cell_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
         )
-        lstm_states_vf = (
-            # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
-            self.hidden_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-            self.cell_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-        )
+        # lstm_states_vf = (
+        #     # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
+        #     self.hidden_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+        #     self.cell_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+        # )
         lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
-        lstm_states_vf = (self.to_torch(lstm_states_vf[0]), self.to_torch(lstm_states_vf[1]))
+        # lstm_states_vf = (self.to_torch(lstm_states_vf[0]), self.to_torch(lstm_states_vf[1]))
 
         return RecurrentRolloutBufferSamples(
             observations=self.pad(self.observations[batch_inds]).swapaxes(0, 1).reshape((padded_batch_size,) + self.obs_shape),
@@ -210,7 +210,7 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             old_log_prob=self.pad(self.log_probs[batch_inds]).swapaxes(0, 1).flatten(),
             advantages=self.pad(self.advantages[batch_inds]).swapaxes(0, 1).flatten(),
             returns=self.pad(self.returns[batch_inds]).swapaxes(0, 1).flatten(),
-            lstm_states=RNNStates(lstm_states_pi, lstm_states_vf),
+            lstm_states=RNNStates(lstm_states_pi, None),
             episode_starts=self.pad(self.episode_starts[batch_inds]).swapaxes(0, 1).flatten(),
         )
 
