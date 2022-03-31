@@ -65,32 +65,32 @@ class RecurrentPPO(OnPolicyAlgorithm):
     """
 
     def __init__(
-        self,
-        policy: Union[str, Type[RecurrentActorCriticPolicy]],
-        env: Union[GymEnv, str],
-        learning_rate: Union[float, Schedule] = 3e-4,
-        n_steps: int = 128,
-        batch_size: Optional[int] = 128,
-        lstm_unroll_length: Optional[int] = None,
-        n_epochs: int = 10,
-        gamma: float = 0.99,
-        gae_lambda: float = 0.95,
-        clip_range: Union[float, Schedule] = 0.2,
-        clip_range_vf: Union[None, float, Schedule] = None,
-        ent_coef: float = 0.0,
-        vf_coef: float = 0.5,
-        max_grad_norm: float = 0.5,
-        use_sde: bool = False,
-        sde_sample_freq: int = -1,
-        target_kl: Optional[float] = None,
-        sampling_strategy: str = "default",  # "default" or "per_env"
-        tensorboard_log: Optional[str] = None,
-        create_eval_env: bool = False,
-        policy_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
-        seed: Optional[int] = None,
-        device: Union[th.device, str] = "auto",
-        _init_setup_model: bool = True,
+            self,
+            policy: Union[str, Type[RecurrentActorCriticPolicy]],
+            env: Union[GymEnv, str],
+            learning_rate: Union[float, Schedule] = 3e-4,
+            n_steps: int = 128,
+            batch_size: Optional[int] = 128,
+            lstm_unroll_length: Optional[int] = None,
+            n_epochs: int = 10,
+            gamma: float = 0.99,
+            gae_lambda: float = 0.95,
+            clip_range: Union[float, Schedule] = 0.2,
+            clip_range_vf: Union[None, float, Schedule] = None,
+            ent_coef: float = 0.0,
+            vf_coef: float = 0.5,
+            max_grad_norm: float = 0.5,
+            use_sde: bool = False,
+            sde_sample_freq: int = -1,
+            target_kl: Optional[float] = None,
+            sampling_strategy: str = "default",  # "default" or "per_env"
+            tensorboard_log: Optional[str] = None,
+            create_eval_env: bool = False,
+            policy_kwargs: Optional[Dict[str, Any]] = None,
+            verbose: int = 0,
+            seed: Optional[int] = None,
+            device: Union[th.device, str] = "auto",
+            _init_setup_model: bool = True,
     ):
         super().__init__(
             policy,
@@ -147,6 +147,10 @@ class RecurrentPPO(OnPolicyAlgorithm):
             use_sde=self.use_sde,
             **self.policy_kwargs,  # pytype:disable=not-instantiable
         )
+        # self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/dummy.pt", device=self.device)
+        # if isinstance(self.policy, tuple):
+        #     self.policy = self.policy[0]
+
         self.policy = self.policy.to(self.device)
 
         print(self.policy)
@@ -194,15 +198,15 @@ class RecurrentPPO(OnPolicyAlgorithm):
             self.clip_range_vf = get_schedule_fn(self.clip_range_vf)
 
     def _setup_learn(
-        self,
-        total_timesteps: int,
-        eval_env: Optional[GymEnv],
-        callback: MaybeCallback = None,
-        eval_freq: int = 10000,
-        n_eval_episodes: int = 5,
-        log_path: Optional[str] = None,
-        reset_num_timesteps: bool = True,
-        tb_log_name: str = "run",
+            self,
+            total_timesteps: int,
+            eval_env: Optional[GymEnv],
+            callback: MaybeCallback = None,
+            eval_freq: int = 10000,
+            n_eval_episodes: int = 5,
+            log_path: Optional[str] = None,
+            reset_num_timesteps: bool = True,
+            tb_log_name: str = "run",
     ) -> Tuple[int, BaseCallback]:
         """
         Initialize different variables needed for training.
@@ -231,11 +235,11 @@ class RecurrentPPO(OnPolicyAlgorithm):
         return total_timesteps, callback
 
     def collect_rollouts(
-        self,
-        env: VecEnv,
-        callback: BaseCallback,
-        rollout_buffer: RolloutBuffer,
-        n_rollout_steps: int,
+            self,
+            env: VecEnv,
+            callback: BaseCallback,
+            rollout_buffer: RolloutBuffer,
+            n_rollout_steps: int,
     ) -> bool:
         """
         Collect experiences using the current policy and fill a ``RolloutBuffer``.
@@ -308,15 +312,15 @@ class RecurrentPPO(OnPolicyAlgorithm):
             # see GitHub issue #633
             for idx, done_ in enumerate(dones):
                 if (
-                    done_
-                    and infos[idx].get("terminal_observation") is not None
-                    and infos[idx].get("TimeLimit.truncated", False)
+                        done_
+                        and infos[idx].get("terminal_observation") is not None
+                        and infos[idx].get("TimeLimit.truncated", False)
                 ):
                     terminal_obs = self.policy.obs_to_tensor(infos[idx]["terminal_observation"])[0]
                     with th.no_grad():
                         terminal_lstm_state = (
-                            lstm_states.vf[0][:, idx : idx + 1, :],
-                            lstm_states.vf[1][:, idx : idx + 1, :],
+                            lstm_states.vf[0][:, idx: idx + 1, :],
+                            lstm_states.vf[1][:, idx: idx + 1, :],
                         )
                         # terminal_lstm_state = None
                         episode_starts = th.tensor([False]).float().to(self.device)
@@ -374,7 +378,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
-                #print(rollout_data)
+                # print(rollout_data)
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -478,16 +482,16 @@ class RecurrentPPO(OnPolicyAlgorithm):
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
     def learn(
-        self,
-        total_timesteps: int,
-        callback: MaybeCallback = None,
-        log_interval: int = 1,
-        eval_env: Optional[GymEnv] = None,
-        eval_freq: int = -1,
-        n_eval_episodes: int = 5,
-        tb_log_name: str = "RecurrentPPO",
-        eval_log_path: Optional[str] = None,
-        reset_num_timesteps: bool = True,
+            self,
+            total_timesteps: int,
+            callback: MaybeCallback = None,
+            log_interval: int = 1,
+            eval_env: Optional[GymEnv] = None,
+            eval_freq: int = -1,
+            n_eval_episodes: int = 5,
+            tb_log_name: str = "RecurrentPPO",
+            eval_log_path: Optional[str] = None,
+            reset_num_timesteps: bool = True,
     ) -> "RecurrentPPO":
         iteration = 0
 
