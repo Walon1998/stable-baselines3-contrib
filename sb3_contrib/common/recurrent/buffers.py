@@ -127,46 +127,67 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         assert self.buffer_size % self.lstm_unroll_length == 0
 
-        assert self.n_envs % batch_size == 0
+        assert batch_size >= self.n_envs
 
-        # Do not shuffle the sequence, only the env indices
-        env_indices = np.random.permutation(self.n_envs)
-        flat_indices = np.arange(self.buffer_size * self.n_envs).reshape(self.n_envs, self.buffer_size)
+        assert batch_size % self.n_envs == 0
 
-        lstm_state_index = np.zeros(self.lstm_unroll_length * batch_size).reshape(self.lstm_unroll_length, batch_size)
-        lstm_state_index[0, :] = 1.0
-        lstm_state_index = self.swap_and_flatten(lstm_state_index)
+        stack_size = int(batch_size / self.n_envs)
 
-        for start_env_idx in range(0, self.n_envs, batch_size):
-            end_env_idx = start_env_idx + batch_size
-            mini_batch_env_indices = env_indices[start_env_idx:end_env_idx]
-            batch_inds = flat_indices[mini_batch_env_indices]
+        assert batch_size * self.lstm_unroll_length == self.buffer_size * self.n_envs
 
-            for i in range(0, self.buffer_size, self.lstm_unroll_length):
-                batch_inds_small = batch_inds[:, i:i + self.lstm_unroll_length].ravel()
+        iterations = int((self.buffer_size / self.lstm_unroll_length) / stack_size)
 
-                lstm_states_pi = (
-                    self.hidden_states_pi[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1),
-                    self.cell_states_pi[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1)
-                )
-                lstm_states_vf = (
-                    self.hidden_states_vf[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1),
-                    self.cell_states_vf[batch_inds_small][lstm_state_index == True].reshape(1, batch_size, -1)
-                )
+        print(stack_size, iterations)
 
-                lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
-                lstm_states_vf = (self.to_torch(lstm_states_vf[0]), self.to_torch(lstm_states_vf[1]))
+        observations_reshape = self.observations.reshape((self.n_envs, -1, 159))
+        actions_reshape = self.actions.reshape((self.n_envs, -1, 7))
+        old_values_reshape = self.values.reshape((self.n_envs, -1, 1))
+        old_log_prob_reshape = self.log_probs.reshape((self.n_envs, -1, 1))
+        advantages_prob_reshape = self.advantages.reshape((self.n_envs, -1, 1))
+        returns_prob_reshape = self.returns.reshape((self.n_envs, -1, 1))
+        hidden_states_pi_prob_reshape = self.hidden_states_pi.reshape((self.n_envs, -1, 1, 1024))
+        cell_states_pi_pi_prob_reshape = self.cell_states_pi.reshape((self.n_envs, -1, 1, 1024))
+        episode_starts_prob_reshape = self.episode_starts.reshape((self.n_envs, -1, 1))
 
-                yield RecurrentRolloutBufferSamples(
-                    observations=self.to_torch(self.observations[batch_inds_small]),
-                    actions=self.to_torch(self.actions[batch_inds_small]),
-                    old_values=self.to_torch(self.values[batch_inds_small].flatten()),
-                    old_log_prob=self.to_torch(self.log_probs[batch_inds_small].flatten()),
-                    advantages=self.to_torch(self.advantages[batch_inds_small].flatten()),
-                    returns=self.to_torch(self.returns[batch_inds_small].flatten()),
-                    lstm_states=RNNStates(lstm_states_pi, lstm_states_vf),
-                    episode_starts=self.to_torch(self.episode_starts[batch_inds_small].flatten()),
-                )
+        for i in range(iterations):
+            obs_stack = []
+            action_stack = []
+            values_stack = []
+            log_probs_stack = []
+            advantages_stack = []
+            returns_stack = []
+            hidden_states_pi_stack = []
+            cell_states_pi_stack = []
+            episode_starts_pi_stack = []
+
+            for j in range(stack_size):
+                obs_stack.append(observations_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                action_stack.append(actions_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                values_stack.append(old_values_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                log_probs_stack.append(old_log_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                advantages_stack.append(advantages_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                returns_stack.append(returns_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+                hidden_states_pi_stack.append(hidden_states_pi_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length, :, :])
+                cell_states_pi_stack.append(cell_states_pi_pi_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length, :, :])
+                episode_starts_pi_stack.append(episode_starts_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
+
+            lstm_states_pi = (
+                np.concatenate(hidden_states_pi_stack, axis=0).reshape(1, batch_size, -1),
+                np.concatenate(cell_states_pi_stack, axis=0).reshape(1, batch_size, -1),
+            )
+
+            lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
+
+            yield RecurrentRolloutBufferSamples(
+                observations=self.to_torch(np.concatenate(obs_stack, axis=0).reshape(-1, 159)),
+                actions=self.to_torch(np.concatenate(action_stack, axis=0).reshape(-1, 7)),
+                old_values=self.to_torch(np.concatenate(values_stack, axis=0).flatten()),
+                old_log_prob=self.to_torch(np.concatenate(log_probs_stack, axis=0).flatten()),
+                advantages=self.to_torch(np.concatenate(advantages_stack, axis=0).flatten()),
+                returns=self.to_torch(np.concatenate(returns_stack, axis=0).flatten()),
+                lstm_states=RNNStates(lstm_states_pi, None),
+                episode_starts=self.to_torch(np.concatenate(episode_starts_pi_stack, axis=0).flatten()),
+            )
 
     def pad(self, tensor: np.ndarray) -> th.Tensor:
         seq = [self.to_torch(tensor[start: end + 1]) for start, end in zip(self.starts, self.ends)]
