@@ -137,8 +137,6 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         iterations = int((self.buffer_size / self.lstm_unroll_length) / stack_size)
 
-        print(stack_size, iterations)
-
         observations_reshape = self.observations.reshape((self.n_envs, -1, 159))
         actions_reshape = self.actions.reshape((self.n_envs, -1, 7))
         old_values_reshape = self.values.reshape((self.n_envs, -1, 1))
