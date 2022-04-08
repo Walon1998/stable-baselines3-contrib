@@ -125,11 +125,11 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         # ==== OpenAI Baselines way of sampling, constraint in the batch size and number of environments ====
 
-        assert self.buffer_size % self.lstm_unroll_length == 0
+        assert self.buffer_size % self.lstm_unroll_length == 0, "{},{}".format(self.buffer_size, self.lstm_unroll_length)
 
-        assert batch_size >= self.n_envs
+        assert batch_size >= self.n_envs, "{},{}".format(batch_size, self.n_envs)
 
-        assert batch_size % self.n_envs == 0
+        assert batch_size % self.n_envs == 0, "{},{}".format(batch_size, self.n_envs)
 
         stack_size = int(batch_size / self.n_envs)
 
