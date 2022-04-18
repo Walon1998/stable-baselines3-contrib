@@ -354,6 +354,36 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         distribution, lstm_states = self.get_distribution(observation, lstm_states, episode_starts)
         return distribution.get_actions(deterministic=deterministic), lstm_states
 
+    def predict_efficient(
+            self,
+            observation,
+            state,
+            episode_start,
+            deterministic: bool = False,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        """
+        Get the policy action from an observation (and optional hidden state).
+        Includes sugar-coating to handle different observations (e.g. normalizing images).
+
+        :param observation: the input observation
+        :param lstm_states: The last hidden and memory states for the LSTM.
+        :param episode_starts: Whether the observations correspond to new episodes
+            or not (we reset the lstm states in that case).
+        :param deterministic: Whether or not to return deterministic actions.
+        :return: the model's action and the next hidden state
+            (used in recurrent policies)
+        """
+
+        with th.no_grad():
+            # Convert to PyTorch tensors
+            episode_start = torch.tensor(episode_start, device=self.device, requires_grad=False, dtype=torch.float32)
+            observation = torch.tensor(observation, device=self.device, requires_grad=False, dtype=torch.float32)
+            actions, states = self._predict(
+                observation, lstm_states=state, episode_starts=episode_start, deterministic=deterministic
+            )
+
+        return actions.cpu().numpy(), states
+
     def predict(
             self,
             observation: Union[np.ndarray, Dict[str, np.ndarray]],
