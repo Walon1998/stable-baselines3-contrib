@@ -56,17 +56,17 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         super().reset()
         self.hidden_states_pi = np.zeros_like(self.lstm_states[0])
         self.cell_states_pi = np.zeros_like(self.lstm_states[1])
-        self.hidden_states_vf = np.zeros_like(self.lstm_states[0])
-        self.cell_states_vf = np.zeros_like(self.lstm_states[1])
+        # self.hidden_states_vf = np.zeros_like(self.lstm_states[0])
+        # self.cell_states_vf = np.zeros_like(self.lstm_states[1])
 
     def add(self, *args, lstm_states: RNNStates, **kwargs) -> None:
         """
         :param hidden_states: LSTM cell and hidden state
         """
-        self.hidden_states_pi[self.pos] = np.array(lstm_states.pi[0].cpu().numpy())
-        self.cell_states_pi[self.pos] = np.array(lstm_states.pi[1].cpu().numpy())
-        self.hidden_states_vf[self.pos] = np.array(lstm_states.vf[0].cpu().numpy())
-        self.cell_states_vf[self.pos] = np.array(lstm_states.vf[1].cpu().numpy())
+        self.hidden_states_pi[self.pos] = np.array(lstm_states.pi[0].cpu().numpy(), dtype=np.float32)
+        self.cell_states_pi[self.pos] = np.array(lstm_states.pi[1].cpu().numpy(), dtype=np.float32)
+        # self.hidden_states_vf[self.pos] = np.array(lstm_states.vf[0].cpu().numpy(), dtype=np.float32)
+        # self.cell_states_vf[self.pos] = np.array(lstm_states.vf[1].cpu().numpy(), dtype=np.float32)
 
         super().add(*args, **kwargs)
 
@@ -77,7 +77,7 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         if not self.generator_ready:
             # hidden_state_shape = (self.n_steps, lstm.num_layers, self.n_envs, lstm.hidden_size)
             # swap first to (self.n_steps, self.n_envs, lstm.num_layers, lstm.hidden_size)
-            for tensor in ["hidden_states_pi", "cell_states_pi", "hidden_states_vf", "cell_states_vf"]:
+            for tensor in ["hidden_states_pi", "cell_states_pi"]:
                 self.__dict__[tensor] = self.__dict__[tensor].swapaxes(1, 2)
 
             for tensor in [
@@ -89,8 +89,6 @@ class RecurrentRolloutBuffer(RolloutBuffer):
                 "returns",
                 "hidden_states_pi",
                 "cell_states_pi",
-                "hidden_states_vf",
-                "cell_states_vf",
                 "episode_starts",
             ]:
                 self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
