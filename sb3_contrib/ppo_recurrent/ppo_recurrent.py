@@ -21,6 +21,32 @@ from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
 from sb3_contrib.common.recurrent.type_aliases import RNNStates
 
 
+def log_helper_efficient(metrics):
+
+    cpu_metrics = []
+
+    for m in metrics:
+        temp = []
+        for entry in m:
+            temp.append(entry.to("cpu", non_blocking=True))
+        cpu_metrics.append(temp)
+
+    numpy_metrics = []
+
+    for m in cpu_metrics:
+        temp = []
+        for entry in m:
+            temp.append(entry.item())
+        numpy_metrics.append(temp)
+
+    mean_metrics = []
+
+    for m in numpy_metrics:
+        mean_metrics.append(np.mean(m))
+
+    return tuple(mean_metrics)
+
+
 class RecurrentPPO(OnPolicyAlgorithm):
     """
     Proximal Policy Optimization algorithm (PPO) (clip version)
@@ -371,6 +397,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         pg_losses, value_losses = [], []
         clip_fractions = []
         approx_kl_divs = []
+        losses = []
 
         # continue_training = True
         # self.policy.features_extractor.debug = True
@@ -412,8 +439,8 @@ class RecurrentPPO(OnPolicyAlgorithm):
             policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
             # Logging
-            pg_losses.append(policy_loss.item())
-            clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float()).item()
+            pg_losses.append(policy_loss)
+            clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float())
             clip_fractions.append(clip_fraction)
 
             # if self.clip_range_vf is None:
@@ -427,7 +454,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             #     )
             # Value loss using the TD(gae_lambda) target
             value_loss = F.mse_loss(rollout_data.returns, values_pred)
-            value_losses.append(value_loss.item())
+            value_losses.append(value_loss)
 
             # Entropy loss favor exploration
             # if entropy is None:
@@ -436,9 +463,10 @@ class RecurrentPPO(OnPolicyAlgorithm):
             # else:
             entropy_loss = -th.mean(entropy)
 
-            entropy_losses.append(entropy_loss.item())
+            entropy_losses.append(entropy_loss)
 
             loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+            losses.append(loss)
 
             # Calculate approximate form of reverse KL Divergence for early stopping
             # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -446,7 +474,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             # and Schulman blog: http://joschu.net/blog/kl-approx.html
             with th.no_grad():
                 log_ratio = log_prob - rollout_data.old_log_prob
-                approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
+                approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio)
                 approx_kl_divs.append(approx_kl_div)
 
             if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
@@ -468,13 +496,19 @@ class RecurrentPPO(OnPolicyAlgorithm):
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
+        metrics = [entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions, losses]
+
+        metrics = log_helper_efficient(metrics)
+
+        entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions, losses = metrics
+
         # Logs
-        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
-        self.logger.record("train/value_loss", np.mean(value_losses))
-        self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
-        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
-        self.logger.record("train/loss", loss.item())
+        self.logger.record("train/entropy_loss", entropy_losses)
+        self.logger.record("train/policy_gradient_loss", pg_losses)
+        self.logger.record("train/value_loss", value_losses)
+        self.logger.record("train/approx_kl", approx_kl_divs)
+        self.logger.record("train/clip_fraction", clip_fractions)
+        self.logger.record("train/loss", losses)
         self.logger.record("train/explained_variance", explained_var)
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
