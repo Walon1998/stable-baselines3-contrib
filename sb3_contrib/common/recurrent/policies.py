@@ -376,8 +376,8 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         with th.no_grad():
             # Convert to PyTorch tensors
-            episode_start = torch.tensor(episode_start, requires_grad=False, dtype=torch.float32).to(self.device, non_blocking=True)
-            observation = torch.tensor(observation, requires_grad=False, dtype=torch.float32).to(self.device, non_blocking=True)
+            episode_start = torch.tensor(episode_start, requires_grad=False, dtype=torch.float32).to(self.device)
+            observation = torch.tensor(observation, requires_grad=False, dtype=torch.float32).to(self.device)
             actions, states = self._predict(
                 observation, lstm_states=state, episode_starts=episode_start, deterministic=deterministic
             )
@@ -423,9 +423,8 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
 
         with th.no_grad():
             # Convert to PyTorch tensors
-            states = th.tensor(state[0], dtype=torch.float32).to(self.device, non_blocking=True), th.tensor(state[1], dtype=torch.float32, pin_memory=True).to(self.device,
-                                                                                                                                                               non_blocking=True)
-            episode_starts = th.tensor(episode_start, dtype=torch.float32).to(self.device, non_blocking=True)
+            states = th.tensor(state[0], dtype=torch.float32).to(self.device), th.tensor(state[1], dtype=torch.float32, pin_memory=True).to(self.device)
+            episode_starts = th.tensor(episode_start, dtype=torch.float32).to(self.device)
             actions, states = self._predict(
                 observation, lstm_states=states, episode_starts=episode_starts, deterministic=deterministic
             )

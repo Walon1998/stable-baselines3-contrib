@@ -310,7 +310,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
-                episode_starts = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
+                episode_starts = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device)
                 actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
 
             actions = actions.cpu().numpy()
@@ -352,7 +352,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
                             lstm_states.vf[1][:, idx: idx + 1, :],
                         )
                         # terminal_lstm_state = None
-                        episode_starts = th.tensor([False], dtype=torch.float32, pin_memory=True).to(self.device, non_blocking=True)
+                        episode_starts = th.tensor([False], dtype=torch.float32, pin_memory=True).to(self.device)
                         terminal_value = self.policy.predict_values(terminal_obs, terminal_lstm_state, episode_starts)[0]
                     rewards[idx] += self.gamma * terminal_value
 
