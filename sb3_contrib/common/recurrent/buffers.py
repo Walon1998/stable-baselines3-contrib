@@ -13,22 +13,6 @@ from sb3_contrib.common.recurrent.type_aliases import (
 )
 
 
-def buffer_helper_to_cpu_async(le_list):
-    cpu_list = []
-
-    for m in le_list:
-        cpu_list.append(m.to("cpu", non_blocking=True))
-
-    torch.cuda.synchronize(device="cuda")
-
-    numpy_list = []
-
-    for m in cpu_list:
-        numpy_list.append(m.numpy())
-
-    return tuple(numpy_list)
-
-
 class RecurrentRolloutBuffer(RolloutBuffer):
     """
     Rollout buffer that also stores the invalid action masks associated with each observation.
@@ -75,35 +59,16 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         # self.hidden_states_vf = np.zeros_like(self.lstm_states[0])
         # self.cell_states_vf = np.zeros_like(self.lstm_states[1])
 
-    def add(self,
-            obs: np.ndarray,
-            action: np.ndarray,
-            reward: np.ndarray,
-            episode_start: np.ndarray,
-            value: th.Tensor,
-            log_prob: th.Tensor,
-            lstm_states: RNNStates) -> None:
+    def add(self, *args, lstm_states: RNNStates, **kwargs) -> None:
         """
         :param hidden_states: LSTM cell and hidden state
         """
-
-        le_list = [lstm_states.pi[0], lstm_states.pi[1], value, log_prob]
-
-        le_new_list = buffer_helper_to_cpu_async(le_list)
-
-        lstm_states_0, lstm_states_1, value, log_prob = le_new_list
-
-        self.hidden_states_pi[self.pos] = lstm_states_0
-        self.cell_states_pi[self.pos] = lstm_states_1
+        self.hidden_states_pi[self.pos] = np.array(lstm_states.pi[0].cpu().numpy(), dtype=np.float32)
+        self.cell_states_pi[self.pos] = np.array(lstm_states.pi[1].cpu().numpy(), dtype=np.float32)
         # self.hidden_states_vf[self.pos] = np.array(lstm_states.vf[0].cpu().numpy(), dtype=np.float32)
         # self.cell_states_vf[self.pos] = np.array(lstm_states.vf[1].cpu().numpy(), dtype=np.float32)
 
-        super().add(obs,
-                    action,
-                    reward,
-                    episode_start,
-                    value,
-                    log_prob)
+        super().add(*args, **kwargs)
 
     def get(self, batch_size: Optional[int] = None) -> Generator[RecurrentRolloutBufferSamples, None, None]:
         assert self.full, ""
