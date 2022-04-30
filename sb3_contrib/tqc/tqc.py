@@ -65,35 +65,35 @@ class TQC(OffPolicyAlgorithm):
     """
 
     def __init__(
-        self,
-        policy: Union[str, Type[TQCPolicy]],
-        env: Union[GymEnv, str],
-        learning_rate: Union[float, Callable] = 3e-4,
-        buffer_size: int = 1000000,  # 1e6
-        learning_starts: int = 100,
-        batch_size: int = 256,
-        tau: float = 0.005,
-        gamma: float = 0.99,
-        train_freq: int = 1,
-        gradient_steps: int = 1,
-        action_noise: Optional[ActionNoise] = None,
-        replay_buffer_class: Optional[ReplayBuffer] = None,
-        replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
-        optimize_memory_usage: bool = False,
-        ent_coef: Union[str, float] = "auto",
-        target_update_interval: int = 1,
-        target_entropy: Union[str, float] = "auto",
-        top_quantiles_to_drop_per_net: int = 2,
-        use_sde: bool = False,
-        sde_sample_freq: int = -1,
-        use_sde_at_warmup: bool = False,
-        tensorboard_log: Optional[str] = None,
-        create_eval_env: bool = False,
-        policy_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
-        seed: Optional[int] = None,
-        device: Union[th.device, str] = "auto",
-        _init_setup_model: bool = True,
+            self,
+            policy: Union[str, Type[TQCPolicy]],
+            env: Union[GymEnv, str],
+            learning_rate: Union[float, Callable] = 3e-4,
+            buffer_size: int = 1000000,  # 1e6
+            learning_starts: int = 100,
+            batch_size: int = 256,
+            tau: float = 0.005,
+            gamma: float = 0.99,
+            train_freq: int = 1,
+            gradient_steps: int = 1,
+            action_noise: Optional[ActionNoise] = None,
+            replay_buffer_class: Optional[ReplayBuffer] = None,
+            replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
+            optimize_memory_usage: bool = False,
+            ent_coef: Union[str, float] = "auto",
+            target_update_interval: int = 1,
+            target_entropy: Union[str, float] = "auto",
+            top_quantiles_to_drop_per_net: int = 2,
+            use_sde: bool = False,
+            sde_sample_freq: int = -1,
+            use_sde_at_warmup: bool = False,
+            tensorboard_log: Optional[str] = None,
+            create_eval_env: bool = False,
+            policy_kwargs: Optional[Dict[str, Any]] = None,
+            verbose: int = 0,
+            seed: Optional[int] = None,
+            device: Union[th.device, str] = "auto",
+            _init_setup_model: bool = True,
     ):
 
         super(TQC, self).__init__(
@@ -168,7 +168,7 @@ class TQC(OffPolicyAlgorithm):
             # Force conversion to float
             # this will throw an error if a malformed string (different from 'auto')
             # is passed
-            self.ent_coef_tensor = th.tensor(float(self.ent_coef)).to(self.device)
+            self.ent_coef_tensor = th.tensor(float(self.ent_coef), pin_memory=True).to(self.device, non_blocking=False)
 
     def _create_aliases(self) -> None:
         self.actor = self.policy.actor
@@ -275,16 +275,16 @@ class TQC(OffPolicyAlgorithm):
             self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
     def learn(
-        self,
-        total_timesteps: int,
-        callback: MaybeCallback = None,
-        log_interval: int = 4,
-        eval_env: Optional[GymEnv] = None,
-        eval_freq: int = -1,
-        n_eval_episodes: int = 5,
-        tb_log_name: str = "TQC",
-        eval_log_path: Optional[str] = None,
-        reset_num_timesteps: bool = True,
+            self,
+            total_timesteps: int,
+            callback: MaybeCallback = None,
+            log_interval: int = 4,
+            eval_env: Optional[GymEnv] = None,
+            eval_freq: int = -1,
+            n_eval_episodes: int = 5,
+            tb_log_name: str = "TQC",
+            eval_log_path: Optional[str] = None,
+            reset_num_timesteps: bool = True,
     ) -> OffPolicyAlgorithm:
 
         return super(TQC, self).learn(
