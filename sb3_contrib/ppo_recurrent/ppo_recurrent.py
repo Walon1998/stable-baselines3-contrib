@@ -282,7 +282,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
-                episode_starts = th.tensor(self._last_episode_starts, dtype=torch.float32).float().to(self.device, non_blocking=True)
+                episode_starts = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
                 actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
 
             actions = actions.cpu().numpy()
