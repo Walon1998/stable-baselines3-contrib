@@ -19,7 +19,7 @@ def buffer_helper_to_cpu_async(le_list):
     for m in le_list:
         cpu_list.append(m.to("cpu", non_blocking=True))
 
-    th.cuda.synchronize(device="cuda")
+    torch.cuda.synchronize(device="cuda")
 
     numpy_list = []
 

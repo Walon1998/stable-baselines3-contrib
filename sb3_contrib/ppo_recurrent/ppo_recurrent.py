@@ -31,7 +31,7 @@ def log_helper_efficient(metrics):
             temp.append(entry.to("cpu", non_blocking=True))
         cpu_metrics.append(temp)
 
-    th.cuda.synchronize(device="cuda")
+    torch.cuda.synchronize(device="cuda")
 
     numpy_metrics = []
 
