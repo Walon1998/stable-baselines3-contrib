@@ -316,8 +316,6 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 # Convert to pytorch tensor or to TensorDict
                 actions, values, log_probs, lstm_states = self.policy.forward(last_obs_gpu, lstm_states, last_episode_starts_gpu)
 
-            lstm_states_0_cpu = lstm_states.pi[0].to("cpu", non_blocking=True)
-            lstm_states_1_cpu = lstm_states.pi[1].to("cpu", non_blocking=True)
             actions = actions.to("cpu", non_blocking=True)
             values_cpu = values.to("cpu", non_blocking=True)
             log_probs_cpu = log_probs.to("cpu", non_blocking=True)
@@ -337,6 +335,8 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
             new_obs_gpu = th.as_tensor(new_obs, dtype=torch.float32).to(self.device, non_blocking=True)
             dones_gpu = th.tensor(dones, dtype=torch.float32).to(self.device, non_blocking=True)
+            lstm_states_0_cpu = lstm_states.pi[0].to("cpu", non_blocking=True)
+            lstm_states_1_cpu = lstm_states.pi[1].to("cpu", non_blocking=True)
 
             self._update_info_buffer(infos)
 
