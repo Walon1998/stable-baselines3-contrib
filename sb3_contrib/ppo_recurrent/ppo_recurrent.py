@@ -175,7 +175,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         #     use_sde=self.use_sde,
         #     **self.policy_kwargs,  # pytype:disable=not-instantiable
         # )
-        self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/dummy.pt", device=self.device)
+        self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/0.pt", device=self.device)
         if isinstance(self.policy, tuple):
             self.policy = self.policy[0]
 
