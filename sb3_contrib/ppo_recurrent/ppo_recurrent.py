@@ -22,7 +22,6 @@ from sb3_contrib.common.recurrent.type_aliases import RNNStates
 
 
 def log_helper_efficient(metrics):
-
     cpu_metrics = []
 
     for m in metrics:
@@ -30,6 +29,8 @@ def log_helper_efficient(metrics):
         for entry in m:
             temp.append(entry.to("cpu", non_blocking=True))
         cpu_metrics.append(temp)
+
+    th.cuda.synchronize(device="cuda")
 
     numpy_metrics = []
 
@@ -300,26 +301,26 @@ class RecurrentPPO(OnPolicyAlgorithm):
         rollout_buffer.initial_lstm_states = deepcopy(self._last_lstm_states)
         lstm_states = deepcopy(self._last_lstm_states)
 
+        last_lstm_states_0_cpu = self._last_lstm_states.pi[0].to("cpu", non_blocking=True)
+        last_lstm_states_1_cpu = self._last_lstm_states.pi[1].to("cpu", non_blocking=True)
+        last_obs_gpu = th.as_tensor(self._last_obs, dtype=torch.float32).to(self.device, non_blocking=True)
+        last_episode_starts_gpu = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
+
         while n_steps < n_rollout_steps:
-            if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
-                # Sample a new noise matrix
-                self.policy.reset_noise(env.num_envs)
+            # if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
+            #     # Sample a new noise matrix
+            #     self.policy.reset_noise(env.num_envs)
+            torch.cuda.synchronize(device="cuda")
 
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
-                obs_tensor = obs_as_tensor(self._last_obs, self.device)
-                episode_starts = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device)
-                actions, values, log_probs, lstm_states = self.policy.forward(obs_tensor, lstm_states, episode_starts)
+                actions, values, log_probs, lstm_states = self.policy.forward(last_obs_gpu, lstm_states, last_episode_starts_gpu)
 
-            actions = actions.cpu().numpy()
-
-            # Rescale and perform action
-            clipped_actions = actions
-            # Clip the actions to avoid out of bound error
-            if isinstance(self.action_space, gym.spaces.Box):
-                clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
-
-            new_obs, rewards, dones, infos = env.step(clipped_actions)
+            lstm_states_0_cpu = lstm_states.pi[0].to("cpu", non_blocking=True)
+            lstm_states_1_cpu = lstm_states.pi[1].to("cpu", non_blocking=True)
+            actions = actions.to("cpu", non_blocking=True)
+            values_cpu = values.to("cpu", non_blocking=True)
+            log_probs_cpu = log_probs.to("cpu", non_blocking=True)
 
             self.num_timesteps += env.num_envs
 
@@ -327,9 +328,17 @@ class RecurrentPPO(OnPolicyAlgorithm):
             callback.update_locals(locals())
             if callback.on_step() is False:
                 return False
+            n_steps += 1
+
+            torch.cuda.synchronize(device="cuda")
+            actions = actions.numpy()
+
+            new_obs, rewards, dones, infos = env.step(actions)
+
+            new_obs_gpu = th.as_tensor(new_obs, dtype=torch.float32).to(self.device, non_blocking=True)
+            dones_gpu = th.tensor(dones, dtype=torch.float32).to(self.device, non_blocking=True)
 
             self._update_info_buffer(infos)
-            n_steps += 1
 
             if isinstance(self.action_space, gym.spaces.Discrete):
                 # Reshape in case of discrete action
@@ -359,18 +368,23 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 actions,
                 rewards,
                 self._last_episode_starts,
-                values,
-                log_probs,
-                lstm_states=self._last_lstm_states,
+                values_cpu,
+                log_probs_cpu,
+                lstm_states_0_cpu=last_lstm_states_0_cpu,
+                lstm_states_1_cpu=last_lstm_states_1_cpu,
             )
 
             self._last_obs = new_obs
+            last_obs_gpu = new_obs_gpu
             self._last_episode_starts = dones
+            last_episode_starts_gpu = dones_gpu
             self._last_lstm_states = lstm_states
+            last_lstm_states_0_cpu = lstm_states_0_cpu
+            last_lstm_states_1_cpu = lstm_states_1_cpu
 
         with th.no_grad():
             # Compute value for the last timestep
-            episode_starts = th.tensor(dones, dtype=torch.float32).to(self.device, non_blocking=False)
+            episode_starts = th.tensor(dones, dtype=torch.float32).to(self.device)
             values = self.policy.predict_values(obs_as_tensor(new_obs, self.device), lstm_states.vf, episode_starts)
 
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)

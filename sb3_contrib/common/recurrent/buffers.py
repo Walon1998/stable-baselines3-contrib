@@ -59,16 +59,29 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         # self.hidden_states_vf = np.zeros_like(self.lstm_states[0])
         # self.cell_states_vf = np.zeros_like(self.lstm_states[1])
 
-    def add(self, *args, lstm_states: RNNStates, **kwargs) -> None:
+    def add(self,
+            obs: np.ndarray,
+            action: np.ndarray,
+            reward: np.ndarray,
+            episode_start: np.ndarray,
+            value: th.Tensor,
+            log_prob: th.Tensor,
+            lstm_states_0_cpu,
+            lstm_states_1_cpu, ) -> None:
         """
         :param hidden_states: LSTM cell and hidden state
         """
-        self.hidden_states_pi[self.pos] = np.array(lstm_states.pi[0].cpu().numpy(), dtype=np.float32)
-        self.cell_states_pi[self.pos] = np.array(lstm_states.pi[1].cpu().numpy(), dtype=np.float32)
+        self.hidden_states_pi[self.pos] = np.array(lstm_states_0_cpu.numpy(), dtype=np.float32)
+        self.cell_states_pi[self.pos] = np.array(lstm_states_1_cpu.numpy(), dtype=np.float32)
         # self.hidden_states_vf[self.pos] = np.array(lstm_states.vf[0].cpu().numpy(), dtype=np.float32)
         # self.cell_states_vf[self.pos] = np.array(lstm_states.vf[1].cpu().numpy(), dtype=np.float32)
 
-        super().add(*args, **kwargs)
+        super().add(obs,
+                    action,
+                    reward,
+                    episode_start,
+                    value,
+                    log_prob)
 
     def get(self, batch_size: Optional[int] = None) -> Generator[RecurrentRolloutBufferSamples, None, None]:
         assert self.full, ""

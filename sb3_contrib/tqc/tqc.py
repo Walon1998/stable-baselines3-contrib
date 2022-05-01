@@ -168,7 +168,7 @@ class TQC(OffPolicyAlgorithm):
             # Force conversion to float
             # this will throw an error if a malformed string (different from 'auto')
             # is passed
-            self.ent_coef_tensor = th.tensor(float(self.ent_coef), pin_memory=True).to(self.device, non_blocking=False)
+            self.ent_coef_tensor = th.tensor(float(self.ent_coef), pin_memory=True).to(self.device)
 
     def _create_aliases(self) -> None:
         self.actor = self.policy.actor
