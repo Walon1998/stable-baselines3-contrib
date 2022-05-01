@@ -301,28 +301,26 @@ class RecurrentPPO(OnPolicyAlgorithm):
         rollout_buffer.initial_lstm_states = deepcopy(self._last_lstm_states)
         lstm_states = deepcopy(self._last_lstm_states)
 
-        action_stream = torch.cuda.Stream(device="cuda")
-        value_prob_stream = torch.cuda.Stream(device="cuda")
-        last_stream = torch.cuda.Stream(device="cuda")
-
-        with torch.cuda.stream(last_stream):
-            last_lstm_states_0_cpu = self._last_lstm_states.pi[0].to("cpu", non_blocking=True)
-            last_lstm_states_1_cpu = self._last_lstm_states.pi[1].to("cpu", non_blocking=True)
-            last_obs_gpu = th.as_tensor(self._last_obs, dtype=torch.float32).to(self.device, non_blocking=True)
-            last_episode_starts_gpu = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
+        last_lstm_states_0_cpu = self._last_lstm_states.pi[0].to("cpu", non_blocking=True)
+        last_lstm_states_1_cpu = self._last_lstm_states.pi[1].to("cpu", non_blocking=True)
+        last_obs_gpu = th.as_tensor(self._last_obs, dtype=torch.float32).to(self.device, non_blocking=True)
+        last_episode_starts_gpu = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
 
         while n_steps < n_rollout_steps:
             # if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
             #     # Sample a new noise matrix
             #     self.policy.reset_noise(env.num_envs)
-            last_stream.synchronize()
+            torch.cuda.synchronize(device="cuda")
 
-            with torch.cuda.stream(action_stream):
-                with th.no_grad():
-                    # Convert to pytorch tensor or to TensorDict
-                    actions, values, log_probs, lstm_states = self.policy.forward(last_obs_gpu, lstm_states, last_episode_starts_gpu)
+            with th.no_grad():
+                # Convert to pytorch tensor or to TensorDict
+                actions, values, log_probs, lstm_states = self.policy.forward(last_obs_gpu, lstm_states, last_episode_starts_gpu)
 
-                actions = actions.to("cpu", non_blocking=True)
+            lstm_states_0_cpu = lstm_states.pi[0].to("cpu", non_blocking=True)
+            lstm_states_1_cpu = lstm_states.pi[1].to("cpu", non_blocking=True)
+            actions = actions.to("cpu", non_blocking=True)
+            values_cpu = values.to("cpu", non_blocking=True)
+            log_probs_cpu = log_probs.to("cpu", non_blocking=True)
 
             self.num_timesteps += env.num_envs
 
@@ -332,21 +330,13 @@ class RecurrentPPO(OnPolicyAlgorithm):
                 return False
             n_steps += 1
 
-            action_stream.synchronize()
+            torch.cuda.synchronize(device="cuda")
             actions = actions.numpy()
 
             new_obs, rewards, dones, infos = env.step(actions)
 
-            with torch.cuda.stream(value_prob_stream):
-                values_cpu = values.to("cpu", non_blocking=True)
-                log_probs_cpu = log_probs.to("cpu", non_blocking=True)
-
-            with torch.cuda.stream(last_stream):
-                lstm_states_0_cpu = lstm_states.pi[0].to("cpu", non_blocking=True)
-                lstm_states_1_cpu = lstm_states.pi[1].to("cpu", non_blocking=True)
-
-                new_obs_gpu = th.as_tensor(new_obs, dtype=torch.float32).to(self.device, non_blocking=True)
-                dones_gpu = th.tensor(dones, dtype=torch.float32).to(self.device, non_blocking=True)
+            new_obs_gpu = th.as_tensor(new_obs, dtype=torch.float32).to(self.device, non_blocking=True)
+            dones_gpu = th.tensor(dones, dtype=torch.float32).to(self.device, non_blocking=True)
 
             self._update_info_buffer(infos)
 
@@ -373,7 +363,6 @@ class RecurrentPPO(OnPolicyAlgorithm):
                         terminal_value = self.policy.predict_values(terminal_obs, terminal_lstm_state, episode_starts)[0]
                     rewards[idx] += self.gamma * terminal_value
 
-            value_prob_stream.synchronize()
             rollout_buffer.add(
                 self._last_obs,
                 actions,
