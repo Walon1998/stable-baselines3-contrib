@@ -301,10 +301,10 @@ class RecurrentPPO(OnPolicyAlgorithm):
         rollout_buffer.initial_lstm_states = deepcopy(self._last_lstm_states)
         lstm_states = deepcopy(self._last_lstm_states)
 
-        last_lstm_states_0_cpu = self._last_lstm_states.pi[0].to("cpu", non_blocking=True)
-        last_lstm_states_1_cpu = self._last_lstm_states.pi[1].to("cpu", non_blocking=True)
-        last_obs_gpu = th.as_tensor(self._last_obs, dtype=torch.float32).to(self.device, non_blocking=True)
-        last_episode_starts_gpu = th.tensor(self._last_episode_starts, dtype=torch.float32).to(self.device, non_blocking=True)
+        last_lstm_states_0_cpu = self._last_lstm_states.pi[0].detach().to("cpu", non_blocking=True)
+        last_lstm_states_1_cpu = self._last_lstm_states.pi[1].detach().to("cpu", non_blocking=True)
+        last_obs_gpu = th.as_tensor(self._last_obs, dtype=torch.float32).detach().to(self.device, non_blocking=True)
+        last_episode_starts_gpu = th.tensor(self._last_episode_starts, dtype=torch.float32).detach().to(self.device, non_blocking=True)
 
         while n_steps < n_rollout_steps:
             # if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
