@@ -168,18 +168,25 @@ class RecurrentPPO(OnPolicyAlgorithm):
             RecurrentDictRolloutBuffer if isinstance(self.observation_space, gym.spaces.Dict) else RecurrentRolloutBuffer
         )
 
-        # self.policy = self.policy_class(
-        #     self.observation_space,
-        #     self.action_space,
-        #     self.lr_schedule,
-        #     use_sde=self.use_sde,
-        #     **self.policy_kwargs,  # pytype:disable=not-instantiable
-        # )
-        self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/0.pt", device=self.device)
-        if isinstance(self.policy, tuple):
-            self.policy = self.policy[0]
+        self.policy = self.policy_class(
+            self.observation_space,
+            self.action_space,
+            self.lr_schedule,
+            use_sde=self.use_sde,
+            **self.policy_kwargs,  # pytype:disable=not-instantiable
+        )
+        # self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/0.pt", device=self.device)
+        # if isinstance(self.policy, tuple):
+        #     self.policy = self.policy[0]
+        #
+        # pytorch_total_params = sum(p.numel() for p in self.policy.parameters())
+        # pytorch_total_params_train = sum(p.numel() for p in self.policy.parameters() if p.requires_grad)
+        #
+        # print(pytorch_total_params, pytorch_total_params_train)
+        #
+        # self.policy = self.policy.to(self.device)
 
-        self.policy = self.policy.to(self.device)
+
 
         # print(self.policy)
 
