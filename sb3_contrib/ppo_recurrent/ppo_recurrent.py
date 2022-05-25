@@ -181,7 +181,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
         self.policy = self.policy.to(self.device)
 
-        # print(self.policy)
+        print(self.policy)
 
         lstm = self.policy.lstm_actor
 
