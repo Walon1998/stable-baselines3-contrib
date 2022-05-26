@@ -168,16 +168,16 @@ class RecurrentPPO(OnPolicyAlgorithm):
             RecurrentDictRolloutBuffer if isinstance(self.observation_space, gym.spaces.Dict) else RecurrentRolloutBuffer
         )
 
-        self.policy = self.policy_class(
-            self.observation_space,
-            self.action_space,
-            self.lr_schedule,
-            use_sde=self.use_sde,
-            **self.policy_kwargs,  # pytype:disable=not-instantiable
-        )
-        # self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/0.pt", device=self.device)
-        # if isinstance(self.policy, tuple):
-        #     self.policy = self.policy[0]
+        # self.policy = self.policy_class(
+        #     self.observation_space,
+        #     self.action_space,
+        #     self.lr_schedule,
+        #     use_sde=self.use_sde,
+        #     **self.policy_kwargs,  # pytype:disable=not-instantiable
+        # )
+        self.policy = RecurrentActorCriticPolicy.load("C:/Users/nevil/PycharmProjects/RLRL/Model/Seer/0.pt", device=self.device)
+        if isinstance(self.policy, tuple):
+            self.policy = self.policy[0]
 
         self.policy = self.policy.to(self.device)
 
