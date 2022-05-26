@@ -45,6 +45,10 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         self.sampling_strategy = sampling_strategy
         self.starts, self.ends = None, None
 
+        print(self.lstm_states[0].shape)
+
+        self.lstm_size = self.lstm_states[0].shape[-1]
+
         if lstm_unroll_length is None:
             self.lstm_unroll_length = buffer_size
         else:
@@ -154,8 +158,8 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         old_log_prob_reshape = self.log_probs.reshape((self.n_envs, -1, 1))
         advantages_prob_reshape = self.advantages.reshape((self.n_envs, -1, 1))
         returns_prob_reshape = self.returns.reshape((self.n_envs, -1, 1))
-        hidden_states_pi_prob_reshape = self.hidden_states_pi.reshape((self.n_envs, -1, 1, 1024))
-        cell_states_pi_pi_prob_reshape = self.cell_states_pi.reshape((self.n_envs, -1, 1, 1024))
+        hidden_states_pi_prob_reshape = self.hidden_states_pi.reshape((self.n_envs, -1, 1, self.lstm_size ))
+        cell_states_pi_pi_prob_reshape = self.cell_states_pi.reshape((self.n_envs, -1, 1, self.lstm_size ))
         episode_starts_prob_reshape = self.episode_starts.reshape((self.n_envs, -1, 1))
 
         for i in range(iterations):
