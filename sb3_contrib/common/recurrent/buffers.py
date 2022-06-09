@@ -152,7 +152,7 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         iterations = int((self.buffer_size / self.lstm_unroll_length) / stack_size)
 
-        observations_reshape = self.observations.reshape((self.n_envs, -1, 155))
+        observations_reshape = self.observations.reshape((self.n_envs, -1, 159))
         actions_reshape = self.actions.reshape((self.n_envs, -1, 7))
         old_values_reshape = self.values.reshape((self.n_envs, -1, 1))
         old_log_prob_reshape = self.log_probs.reshape((self.n_envs, -1, 1))
@@ -192,7 +192,7 @@ class RecurrentRolloutBuffer(RolloutBuffer):
             lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
 
             yield RecurrentRolloutBufferSamples(
-                observations=self.to_torch(np.concatenate(obs_stack, axis=0).reshape(-1, 155)),
+                observations=self.to_torch(np.concatenate(obs_stack, axis=0).reshape(-1, 159)),
                 actions=self.to_torch(np.concatenate(action_stack, axis=0).reshape(-1, 7)),
                 old_values=self.to_torch(np.concatenate(values_stack, axis=0).flatten()),
                 old_log_prob=self.to_torch(np.concatenate(log_probs_stack, axis=0).flatten()),
