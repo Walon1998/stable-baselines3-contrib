@@ -148,9 +148,14 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         stack_size = int(batch_size / self.n_envs)
 
-        assert batch_size * self.lstm_unroll_length == self.buffer_size * self.n_envs, "{},{},{},{}".format(batch_size, self.lstm_unroll_length, self.buffer_size, self.n_envs)
+        # print("stack_size: ", stack_size)
+
+        # assert batch_size * self.lstm_unroll_length == self.buffer_size * self.n_envs, "{},{},{},{}".format(batch_size, self.lstm_unroll_length, self.buffer_size, self.n_envs)
 
         iterations = int((self.buffer_size / self.lstm_unroll_length) / stack_size)
+
+        # print("iterations: ", iterations)
+
 
         observations_reshape = self.observations.reshape((self.n_envs, -1, 159))
         actions_reshape = self.actions.reshape((self.n_envs, -1, 7))
