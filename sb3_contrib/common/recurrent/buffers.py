@@ -151,22 +151,24 @@ class RecurrentRolloutBuffer(RolloutBuffer):
         iterations = total_samples / batch_size
 
         for i in range(int(iterations)):
+            s = batch_size * self.lstm_unroll_length
+
             lstm_states_pi = (
-                self.hidden_states_pi[i * batch_size:(i + 1) * batch_size, :, :].reshape(1, batch_size, -1),
-                self.cell_states_pi[i * batch_size:(i + 1) * batch_size, :, :].reshape(1, batch_size, -1),
+                self.hidden_states_pi[i * s:(i + 1) * s:self.lstm_unroll_length, :, :].reshape(1, batch_size, -1),
+                self.cell_states_pi[i * s:(i + 1) * s:self.lstm_unroll_length, :, :].reshape(1, batch_size, -1),
             )
 
             lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
 
             yield RecurrentRolloutBufferSamples(
-                observations=self.to_torch(self.observations[i * batch_size:(i + 1) * batch_size, :]),
-                actions=self.to_torch(self.actions[i * batch_size:(i + 1) * batch_size, :]),
-                old_values=self.to_torch(self.values[i * batch_size:(i + 1) * batch_size].ravel()),
-                old_log_prob=self.to_torch(self.log_probs[i * batch_size:(i + 1) * batch_size].ravel()),
-                advantages=self.to_torch(self.advantages[i * batch_size:(i + 1) * batch_size].ravel()),
-                returns=self.to_torch(self.returns[i * batch_size:(i + 1) * batch_size].ravel()),
+                observations=self.to_torch(self.observations[i * s:(i + 1) * s, :]),
+                actions=self.to_torch(self.actions[i * s:(i + 1) * s, :]),
+                old_values=self.to_torch(self.values[i * s:(i + 1) * s].ravel()),
+                old_log_prob=self.to_torch(self.log_probs[i * s:(i + 1) * s].ravel()),
+                advantages=self.to_torch(self.advantages[i * s:(i + 1) * s].ravel()),
+                returns=self.to_torch(self.returns[i * s:(i + 1) * s].ravel()),
                 lstm_states=RNNStates(lstm_states_pi, None),
-                episode_starts=self.to_torch(self.episode_starts[i * batch_size:(i + 1) * batch_size].ravel()),
+                episode_starts=self.to_torch(self.episode_starts[i * s:(i + 1) * s].ravel()),
             )
 
 
