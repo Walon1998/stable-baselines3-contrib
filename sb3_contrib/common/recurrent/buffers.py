@@ -142,116 +142,80 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         assert self.buffer_size % self.lstm_unroll_length == 0, "{},{}".format(self.buffer_size, self.lstm_unroll_length)
 
-        assert batch_size >= self.n_envs, "{},{}".format(batch_size, self.n_envs)
+        total_samples = self.observations.shape[0] / self.lstm_unroll_length
 
-        assert batch_size % self.n_envs == 0, "{},{}".format(batch_size, self.n_envs)
+        assert total_samples % batch_size == 0, "{},{}".format(total_samples, batch_size)
 
-        stack_size = int(batch_size / self.n_envs)
+        assert total_samples >= batch_size, "{},{}".format(total_samples, batch_size)
 
-        # print("stack_size: ", stack_size)
+        iterations = total_samples / batch_size
 
-        # assert batch_size * self.lstm_unroll_length == self.buffer_size * self.n_envs, "{},{},{},{}".format(batch_size, self.lstm_unroll_length, self.buffer_size, self.n_envs)
-
-        iterations = int((self.buffer_size / self.lstm_unroll_length) / stack_size)
-
-        # print("iterations: ", iterations)
-
-
-        observations_reshape = self.observations.reshape((self.n_envs, -1, 159))
-        actions_reshape = self.actions.reshape((self.n_envs, -1, 7))
-        old_values_reshape = self.values.reshape((self.n_envs, -1, 1))
-        old_log_prob_reshape = self.log_probs.reshape((self.n_envs, -1, 1))
-        advantages_prob_reshape = self.advantages.reshape((self.n_envs, -1, 1))
-        returns_prob_reshape = self.returns.reshape((self.n_envs, -1, 1))
-        hidden_states_pi_prob_reshape = self.hidden_states_pi.reshape((self.n_envs, -1, 1, self.lstm_size ))
-        cell_states_pi_pi_prob_reshape = self.cell_states_pi.reshape((self.n_envs, -1, 1, self.lstm_size ))
-        episode_starts_prob_reshape = self.episode_starts.reshape((self.n_envs, -1, 1))
-
-        for i in range(iterations):
-            obs_stack = []
-            action_stack = []
-            values_stack = []
-            log_probs_stack = []
-            advantages_stack = []
-            returns_stack = []
-            hidden_states_pi_stack = []
-            cell_states_pi_stack = []
-            episode_starts_pi_stack = []
-
-            for j in range(stack_size):
-                obs_stack.append(observations_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                action_stack.append(actions_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                values_stack.append(old_values_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                log_probs_stack.append(old_log_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                advantages_stack.append(advantages_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                returns_stack.append(returns_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-                hidden_states_pi_stack.append(hidden_states_pi_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length, :, :])
-                cell_states_pi_stack.append(cell_states_pi_pi_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length, :, :])
-                episode_starts_pi_stack.append(episode_starts_prob_reshape[:, (i * stack_size + j) * self.lstm_unroll_length:(i * stack_size + j + 1) * self.lstm_unroll_length, :])
-
+        for i in range(int(iterations)):
             lstm_states_pi = (
-                np.concatenate(hidden_states_pi_stack, axis=0).reshape(1, batch_size, -1),
-                np.concatenate(cell_states_pi_stack, axis=0).reshape(1, batch_size, -1),
+                self.hidden_states_pi[i * batch_size:(i + 1) * batch_size, :, :].reshape(1, batch_size, -1),
+                self.cell_states_pi[i * batch_size:(i + 1) * batch_size, :, :].reshape(1, batch_size, -1),
             )
 
             lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
 
             yield RecurrentRolloutBufferSamples(
-                observations=self.to_torch(np.concatenate(obs_stack, axis=0).reshape(-1, 159)),
-                actions=self.to_torch(np.concatenate(action_stack, axis=0).reshape(-1, 7)),
-                old_values=self.to_torch(np.concatenate(values_stack, axis=0).flatten()),
-                old_log_prob=self.to_torch(np.concatenate(log_probs_stack, axis=0).flatten()),
-                advantages=self.to_torch(np.concatenate(advantages_stack, axis=0).flatten()),
-                returns=self.to_torch(np.concatenate(returns_stack, axis=0).flatten()),
+                observations=self.to_torch(self.observations[i * batch_size:(i + 1) * batch_size, :]),
+                actions=self.to_torch(self.actions[i * batch_size:(i + 1) * batch_size, :]),
+                old_values=self.to_torch(self.values[i * batch_size:(i + 1) * batch_size].ravel()),
+                old_log_prob=self.to_torch(self.log_probs[i * batch_size:(i + 1) * batch_size].ravel()),
+                advantages=self.to_torch(self.advantages[i * batch_size:(i + 1) * batch_size].ravel()),
+                returns=self.to_torch(self.returns[i * batch_size:(i + 1) * batch_size].ravel()),
                 lstm_states=RNNStates(lstm_states_pi, None),
-                episode_starts=self.to_torch(np.concatenate(episode_starts_pi_stack, axis=0).flatten()),
+                episode_starts=self.to_torch(self.episode_starts[i * batch_size:(i + 1) * batch_size].ravel()),
             )
 
-    def pad(self, tensor: np.ndarray) -> th.Tensor:
-        seq = [self.to_torch(tensor[start: end + 1]) for start, end in zip(self.starts, self.ends)]
-        return th.nn.utils.rnn.pad_sequence(seq)
 
-    def _get_samples(
-            self,
-            batch_inds: np.ndarray,
-            env_change: np.ndarray,
-            env: Optional[VecNormalize] = None,
-    ) -> RecurrentRolloutBufferSamples:
-        # Create sequence if env change too
-        seq_start = np.logical_or(self.episode_starts[batch_inds], env_change[batch_inds]).flatten()
-        # First index is always the beginning of a sequence
-        seq_start[0] = True
-        self.starts = np.where(seq_start == True)[0]  # noqa: E712
-        self.ends = np.concatenate([(self.starts - 1)[1:], np.array([len(batch_inds)])])
+def pad(self, tensor: np.ndarray) -> th.Tensor:
+    seq = [self.to_torch(tensor[start: end + 1]) for start, end in zip(self.starts, self.ends)]
+    return th.nn.utils.rnn.pad_sequence(seq)
 
-        n_layers = self.hidden_states_pi.shape[1]
-        n_seq = len(self.starts)
-        max_length = self.pad(self.actions[batch_inds]).shape[0]
-        # TODO: output mask to not backpropagate everywhere
-        padded_batch_size = n_seq * max_length
-        lstm_states_pi = (
-            # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
-            self.hidden_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-            self.cell_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-        )
-        # lstm_states_vf = (
-        #     # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
-        #     self.hidden_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-        #     self.cell_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
-        # )
-        lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
-        # lstm_states_vf = (self.to_torch(lstm_states_vf[0]), self.to_torch(lstm_states_vf[1]))
 
-        return RecurrentRolloutBufferSamples(
-            observations=self.pad(self.observations[batch_inds]).swapaxes(0, 1).reshape((padded_batch_size,) + self.obs_shape),
-            actions=self.pad(self.actions[batch_inds]).swapaxes(0, 1).reshape((padded_batch_size,) + self.actions.shape[1:]),
-            old_values=self.pad(self.values[batch_inds]).swapaxes(0, 1).flatten(),
-            old_log_prob=self.pad(self.log_probs[batch_inds]).swapaxes(0, 1).flatten(),
-            advantages=self.pad(self.advantages[batch_inds]).swapaxes(0, 1).flatten(),
-            returns=self.pad(self.returns[batch_inds]).swapaxes(0, 1).flatten(),
-            lstm_states=RNNStates(lstm_states_pi, None),
-            episode_starts=self.pad(self.episode_starts[batch_inds]).swapaxes(0, 1).flatten(),
-        )
+def _get_samples(
+        self,
+        batch_inds: np.ndarray,
+        env_change: np.ndarray,
+        env: Optional[VecNormalize] = None,
+) -> RecurrentRolloutBufferSamples:
+    # Create sequence if env change too
+    seq_start = np.logical_or(self.episode_starts[batch_inds], env_change[batch_inds]).flatten()
+    # First index is always the beginning of a sequence
+    seq_start[0] = True
+    self.starts = np.where(seq_start == True)[0]  # noqa: E712
+    self.ends = np.concatenate([(self.starts - 1)[1:], np.array([len(batch_inds)])])
+
+    n_layers = self.hidden_states_pi.shape[1]
+    n_seq = len(self.starts)
+    max_length = self.pad(self.actions[batch_inds]).shape[0]
+    # TODO: output mask to not backpropagate everywhere
+    padded_batch_size = n_seq * max_length
+    lstm_states_pi = (
+        # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
+        self.hidden_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+        self.cell_states_pi[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+    )
+    # lstm_states_vf = (
+    #     # (n_steps, n_layers, n_envs, dim) -> (n_layers, n_seq, dim)
+    #     self.hidden_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+    #     self.cell_states_vf[batch_inds][seq_start == True].reshape(n_layers, n_seq, -1),  # noqa: E712
+    # )
+    lstm_states_pi = (self.to_torch(lstm_states_pi[0]), self.to_torch(lstm_states_pi[1]))
+    # lstm_states_vf = (self.to_torch(lstm_states_vf[0]), self.to_torch(lstm_states_vf[1]))
+
+    return RecurrentRolloutBufferSamples(
+        observations=self.pad(self.observations[batch_inds]).swapaxes(0, 1).reshape((padded_batch_size,) + self.obs_shape),
+        actions=self.pad(self.actions[batch_inds]).swapaxes(0, 1).reshape((padded_batch_size,) + self.actions.shape[1:]),
+        old_values=self.pad(self.values[batch_inds]).swapaxes(0, 1).flatten(),
+        old_log_prob=self.pad(self.log_probs[batch_inds]).swapaxes(0, 1).flatten(),
+        advantages=self.pad(self.advantages[batch_inds]).swapaxes(0, 1).flatten(),
+        returns=self.pad(self.returns[batch_inds]).swapaxes(0, 1).flatten(),
+        lstm_states=RNNStates(lstm_states_pi, None),
+        episode_starts=self.pad(self.episode_starts[batch_inds]).swapaxes(0, 1).flatten(),
+    )
 
 
 class RecurrentDictRolloutBuffer(DictRolloutBuffer):
