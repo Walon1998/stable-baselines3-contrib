@@ -150,6 +150,8 @@ class RecurrentRolloutBuffer(RolloutBuffer):
 
         iterations = total_samples / batch_size
 
+        assert iterations == 1, "Not full batch gradient descent!"
+
         for i in range(int(iterations)):
             s = batch_size * self.lstm_unroll_length
 
