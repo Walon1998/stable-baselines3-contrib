@@ -411,7 +411,6 @@ class RecurrentPPO(OnPolicyAlgorithm):
         pg_losses, value_losses = [], []
         clip_fractions = []
         approx_kl_divs = []
-        losses = []
 
         # continue_training = True
         # self.policy.features_extractor.debug = True
@@ -454,8 +453,9 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
             # Logging
             pg_losses.append(policy_loss)
-            clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float())
-            clip_fractions.append(clip_fraction)
+            if epoch == self.n_epochs - 1:
+                clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float())
+                clip_fractions.append(clip_fraction)
 
             # if self.clip_range_vf is None:
             #     # No clipping
@@ -480,22 +480,23 @@ class RecurrentPPO(OnPolicyAlgorithm):
             entropy_losses.append(entropy_loss)
 
             loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
-            losses.append(loss)
+            # losses.append(loss)
 
             # Calculate approximate form of reverse KL Divergence for early stopping
             # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
             # and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
             # and Schulman blog: http://joschu.net/blog/kl-approx.html
-            with th.no_grad():
-                log_ratio = log_prob - rollout_data.old_log_prob
-                approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio)
-                approx_kl_divs.append(approx_kl_div)
-
-            if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
-                continue_training = False
-                if self.verbose >= 1:
-                    print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
-                break
+            if epoch == self.n_epochs - 1:
+                with th.no_grad():
+                    log_ratio = log_prob - rollout_data.old_log_prob
+                    approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio)
+                    approx_kl_divs.append(approx_kl_div)
+            #
+            # if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
+            #     continue_training = False
+            #     if self.verbose >= 1:
+            #         print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+            #     break
 
             # Optimization step
             self.policy.optimizer.zero_grad()
@@ -510,11 +511,11 @@ class RecurrentPPO(OnPolicyAlgorithm):
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
-        metrics = [entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions, losses]
+        metrics = [entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions]
 
         metrics = log_helper_efficient(metrics)
 
-        entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions, losses = metrics
+        entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions = metrics
 
         # Logs
         self.logger.record("train/entropy_loss", entropy_losses)
@@ -522,7 +523,7 @@ class RecurrentPPO(OnPolicyAlgorithm):
         self.logger.record("train/value_loss", value_losses)
         self.logger.record("train/approx_kl", approx_kl_divs)
         self.logger.record("train/clip_fraction", clip_fractions)
-        self.logger.record("train/loss", losses)
+        # self.logger.record("train/loss", losses)
         self.logger.record("train/explained_variance", explained_var)
         if hasattr(self.policy, "log_std"):
             self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
