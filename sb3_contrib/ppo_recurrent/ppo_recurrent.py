@@ -21,7 +21,7 @@ from sb3_contrib.common.recurrent.policies import RecurrentActorCriticPolicy
 from sb3_contrib.common.recurrent.type_aliases import RNNStates
 
 
-def log_helper_efficient(metrics):
+def log_helper_efficient_to_cuda(metrics):
     cpu_metrics = []
 
     for m in metrics:
@@ -29,7 +29,10 @@ def log_helper_efficient(metrics):
         for entry in m:
             temp.append(entry.to("cpu", non_blocking=True))
         cpu_metrics.append(temp)
+    return cpu_metrics
 
+
+def log_helper_efficient(cpu_metrics):
     th.cuda.synchronize(device="cuda")
 
     numpy_metrics = []
@@ -507,13 +510,13 @@ class RecurrentPPO(OnPolicyAlgorithm):
 
             # if not continue_training:
             #     break
+        metrics = [entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions]
+        cpu_metrics = log_helper_efficient_to_cuda(metrics)
 
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 
-        metrics = [entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions]
-
-        metrics = log_helper_efficient(metrics)
+        metrics = log_helper_efficient(cpu_metrics)
 
         entropy_losses, pg_losses, value_losses, approx_kl_divs, clip_fractions = metrics
 
